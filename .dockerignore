@@ -1,0 +1,12 @@
+# Effective for the API image (build context = repo root).
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+.git
+**/*.log
+.env
+.env.*
+apps/dashboard
+docs
+IMPLEMENTATION.md

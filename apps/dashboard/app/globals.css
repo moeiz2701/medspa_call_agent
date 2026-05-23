@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --aura-pink: #f06aa5;
+  --aura-rose: #c84a82;
+  --aura-magenta: #a23770;
+  --aura-plum: #5c2a55;
+  --aura-mauve: #3d2050;
+  --aura-purple: #2d1944;
+  --aura-indigo: #1f1638;
+  --aura-blue: #3d5d99;
+  --aura-sky: #7aa5d6;
+  --aura-night: #0e0a1c;
+  --aura-ink: #f4ecf6;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  @apply text-aura-ink antialiased;
+  background:
+    radial-gradient(900px 600px at 12% 8%, rgba(240, 106, 165, 0.35), transparent 65%),
+    radial-gradient(1100px 700px at 92% 96%, rgba(61, 93, 153, 0.45), transparent 65%),
+    radial-gradient(700px 500px at 80% 18%, rgba(162, 55, 112, 0.28), transparent 60%),
+    linear-gradient(160deg, #14091f 0%, #2a1542 25%, #3d1f55 55%, #1c2a4a 85%, #0c0a1c 100%);
+  background-attachment: fixed;
+}
+
+@layer components {
+  .glass {
+    @apply rounded-2xl border border-white/10 bg-white/[0.06] backdrop-blur-xl shadow-glass;
+  }
+  .glass-strong {
+    @apply rounded-2xl border border-white/15 bg-white/[0.09] backdrop-blur-xl shadow-glass;
+  }
+  .glass-dark {
+    @apply rounded-2xl border border-white/10 bg-aura-night/60 backdrop-blur-xl shadow-glass;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-aura-pink px-5 py-2.5 text-sm font-medium text-white shadow-glass transition hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/15;
+  }
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}

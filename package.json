@@ -1,0 +1,26 @@
+{
+  "name": "medspa-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Med Spa Call Agent — MVP v1 (Vapi + Twilio + Claude + ElevenLabs + Deepgram)",
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "db:push": "pnpm --filter @medspa/db push",
+    "db:seed": "pnpm --filter @medspa/db seed",
+    "vapi:deploy": "tsx infra/vapi/deploy.ts",
+    "dev:demo": "powershell -ExecutionPolicy Bypass -NoProfile -File scripts/dev-demo.ps1"
+  },
+  "devDependencies": {
+    "dotenv": "^16.0.0",
+    "tsx": "^4.19.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.0"
+  }
+}

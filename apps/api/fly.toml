@@ -1,0 +1,33 @@
+# apps/api/fly.toml
+# Deploy from repo root:
+#   fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
+#
+# IMPORTANT: `app` must be globally unique on Fly. Either change it before the
+# first `fly launch`, or let `fly launch` generate a unique name and update
+# this file.
+app = "medspa-api"
+primary_region = "iad"
+
+[build]
+dockerfile = "apps/api/Dockerfile"
+
+[http_service]
+internal_port = 3001
+force_https = true
+# Keep a machine warm so SSE connections (/v1/dashboard/live) and the
+# in-process liveBus stay alive between calls. Free tier allows this for one
+# shared-cpu-1x machine.
+auto_stop_machines = false
+auto_start_machines = true
+min_machines_running = 1
+
+[[http_service.checks]]
+grace_period = "10s"
+interval = "30s"
+method = "GET"
+timeout = "5s"
+path = "/healthz"
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "512mb"
