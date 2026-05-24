@@ -5,6 +5,18 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
+// Show times in the spa's timezone (see bookings/page.tsx for full reasoning).
+const SPA_TZ = 'America/New_York';
+const spaDateTime = new Intl.DateTimeFormat('en-US', {
+  timeZone: SPA_TZ,
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
 export default function CallDetail() {
   const { id } = useParams<{ id: string }>();
   const { data } = useQuery({ queryKey: ['call', id], queryFn: () => fetchCall(id) });
@@ -25,7 +37,7 @@ export default function CallDetail() {
           Call detail
         </h1>
         <p className="text-sm text-white/75">
-          {call.fromNumber} &bull; {new Date(call.startedAt).toLocaleString()}
+          {call.fromNumber} &bull; {spaDateTime.format(new Date(call.startedAt))} ET
         </p>
       </div>
 

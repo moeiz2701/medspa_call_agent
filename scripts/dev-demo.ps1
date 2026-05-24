@@ -39,6 +39,19 @@ if (-not (Test-Path $envPath)) {
     exit 1
 }
 
+# Capture the original API_BASE_URL so we can restore it (and re-point Vapi
+# at production) when this script exits. Without this, a local-dev session
+# leaves Vapi pointed at the now-dead tunnel and the deployed app silently
+# breaks until the user remembers to run `pnpm vapi:deploy`.
+$originalContent = Get-Content $envPath -Raw
+$originalUrlMatch = [regex]::Match($originalContent, '(?m)^API_BASE_URL=(.+)$')
+$originalUrl = if ($originalUrlMatch.Success) { $originalUrlMatch.Groups[1].Value.Trim() } else { $null }
+if ($originalUrl) {
+    Write-Ok "Captured original API_BASE_URL: $originalUrl (will restore on exit)"
+} else {
+    Write-Warn2 "No existing API_BASE_URL in .env -- nothing to restore on exit. You'll need to set it + run 'pnpm vapi:deploy' manually after stopping the script."
+}
+
 # ---------- Start API and dashboard in new windows ----------
 Write-Step "Starting API (port 3001) in a new window..."
 Start-Process powershell -ArgumentList @(
@@ -125,4 +138,24 @@ try {
 } finally {
     Write-Warn2 "Stopping tunnel..."
     Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue
+
+    # Restore .env and re-point Vapi at production so the deployed app
+    # keeps working after this local session ends.
+    if ($originalUrl -and $originalUrl -ne $url) {
+        Write-Step "Restoring API_BASE_URL to $originalUrl in .env ..."
+        $restoreContent = Get-Content $envPath -Raw
+        $restoreContent = [regex]::Replace($restoreContent, '(?m)^API_BASE_URL=.*$', "API_BASE_URL=$originalUrl")
+        Set-Content -Path $envPath -Value $restoreContent -NoNewline -Encoding utf8
+
+        Write-Step "Re-pointing Vapi at $originalUrl (pnpm vapi:deploy)..."
+        pnpm vapi:deploy
+        if ($LASTEXITCODE -eq 0) {
+            Write-Ok "Vapi restored to $originalUrl -- deployed app is live again."
+        } else {
+            Write-Warn2 "vapi:deploy failed during restore. Run it manually: pnpm vapi:deploy"
+        }
+    } elseif (-not $originalUrl) {
+        Write-Warn2 "Vapi is still pointed at the (now-dead) tunnel URL."
+        Write-Warn2 "Set API_BASE_URL in .env to your production URL and run: pnpm vapi:deploy"
+    }
 }

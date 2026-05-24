@@ -1,8 +1,25 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import { fetchBookings } from '@/lib/api';
-import { format } from 'date-fns';
 import { CalendarDays, Clock, User as UserIcon, Sparkles } from 'lucide-react';
+
+// Render appointment times in the SPA'S timezone, not the viewer's browser tz
+// (otherwise "10 AM Eastern" appears as 7 AM on a Pacific machine, 8 PM in
+// Karachi, etc.). MVP is single-spa, so the timezone is hardcoded; if/when
+// we go multi-spa, include the spa's timezone in the booking API response.
+const SPA_TZ = 'America/New_York';
+const spaDate = new Intl.DateTimeFormat('en-US', {
+  timeZone: SPA_TZ,
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+});
+const spaTime = new Intl.DateTimeFormat('en-US', {
+  timeZone: SPA_TZ,
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
 
 export default function BookingsPage() {
   const { data: bookings } = useQuery({
@@ -50,7 +67,10 @@ export default function BookingsPage() {
                 <td className="p-3 text-sm">{b.serviceName}</td>
                 <td className="p-3 text-sm">{b.providerName}</td>
                 <td className="p-3 text-sm">
-                  {format(new Date(b.appointment.startsAt), 'EEE, MMM d • h:mm a')}
+                  {(() => {
+                    const d = new Date(b.appointment.startsAt);
+                    return `${spaDate.format(d)} • ${spaTime.format(d)} ET`;
+                  })()}
                 </td>
                 <td className="p-3 text-sm">
                   {b.appointment.estimatedValue != null
@@ -75,8 +95,9 @@ export default function BookingsPage() {
         {bookings.map((b) => {
           const name =
             `${b.clientFirstName ?? ''} ${b.clientLastName ?? ''}`.trim() || 'Guest';
-          const when = format(new Date(b.appointment.startsAt), 'EEE, MMM d');
-          const time = format(new Date(b.appointment.startsAt), 'h:mm a');
+          const d = new Date(b.appointment.startsAt);
+          const when = spaDate.format(d);
+          const time = `${spaTime.format(d)} ET`;
           return (
             <div key={b.appointment.id} className="glass-strong p-4">
               <div className="mb-2 flex items-center justify-between">
