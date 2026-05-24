@@ -19,7 +19,7 @@ Vapi cloud ──► Fly.io (Fastify API, free) ──► Supabase Postgres (fre
 ## 0. Prerequisites
 
 - Accounts: GitHub, Vercel, Fly.io, Supabase (and Vapi — already set up).
-- `flyctl` installed: `winget install Fly-io.flyctl` (Windows) or `iwr https://fly.io/install.ps1 -useb | iex`.
+- `flyctl` installed (Windows, official): `iwr https://fly.io/install.ps1 -useb | iex` — then **open a new PowerShell window** so `PATH` refreshes. Verify with `fly version`.
 - The repo pushed to a GitHub repo (Vercel imports from there).
 - A working `.env` locally that you've already used to run the demo. You will
   paste most of these values into Fly secrets and Vercel env vars.

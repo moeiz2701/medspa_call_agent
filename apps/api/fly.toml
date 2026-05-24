@@ -5,11 +5,13 @@
 # IMPORTANT: `app` must be globally unique on Fly. Either change it before the
 # first `fly launch`, or let `fly launch` generate a unique name and update
 # this file.
-app = "medspa-api"
+app = "medspa-api-abdul"
 primary_region = "iad"
 
-[build]
-dockerfile = "apps/api/Dockerfile"
+# Dockerfile path is passed via the CLI `--dockerfile` flag so the build
+# context stays at the repo root (the Dockerfile COPYs pnpm-workspace.yaml
+# etc. from there). Don't add a [build] block here — Fly would interpret
+# its `dockerfile` path relative to this file's directory and double-prefix.
 
 [http_service]
 internal_port = 3001

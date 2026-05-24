@@ -12,6 +12,25 @@ import { eq, and, ilike } from 'drizzle-orm';
 import { logToolCall } from '../lib/logging';
 import type { TimeSlot } from '../adapters/types';
 
+type TodBand = 'morning' | 'afternoon' | 'evening' | 'late';
+
+function bandFor(date: Date, tz: string): TodBand {
+  const h = toZonedTime(date, tz).getHours();
+  if (h >= 6 && h < 12) return 'morning';
+  if (h >= 12 && h < 17) return 'afternoon';
+  if (h >= 17 && h < 22) return 'evening';
+  return 'late';
+}
+
+function formatSlot(slot: TimeSlot, tz: string): string {
+  const local = toZonedTime(slot.startsAt, tz);
+  const band = bandFor(slot.startsAt, tz);
+  const bandLabel = band.charAt(0).toUpperCase() + band.slice(1);
+  const dayLabel = format(local, 'EEEE, MMM d');
+  const timeLabel = format(local, 'h:mm a');
+  return `- ${bandLabel}: ${dayLabel} at ${timeLabel} with ${slot.providerName} (slot ID: ${slot.startsAt.toISOString()})`;
+}
+
 const ArgsSchema = z.object({
   service_name: z.string(),
   provider_name: z.string().optional(),
@@ -113,39 +132,73 @@ export async function getAvailabilityRoute(app: FastifyInstance) {
     }
 
     const range = parsePreferredDay(args.preferred_day, tz);
-    let slots = await pms.getAvailability({
+    const dayUnfiltered = await pms.getAvailability({
       spaId: env.DEMO_SPA_ID,
       serviceId: service.id,
       providerId,
       rangeStart: range.start,
       rangeEnd: range.end,
-      maxSlots: 12,
+      maxSlots: 24,
     });
-    slots = filterByTimeOfDay(slots, args.preferred_time_of_day, tz);
-    slots = slots.slice(0, 6);
+    const dayPreferred = filterByTimeOfDay(
+      dayUnfiltered,
+      args.preferred_time_of_day,
+      tz,
+    );
+    const todPretty =
+      args.preferred_time_of_day && args.preferred_time_of_day !== 'any'
+        ? args.preferred_time_of_day
+        : null;
+    const dayLabel = args.preferred_day ? ` ${args.preferred_day}` : '';
 
     let result: string;
-    if (slots.length === 0) {
-      result = `No availability found for ${service.name}${
-        args.preferred_day ? ` ${args.preferred_day}` : ''
-      }. Suggest a different day or provider.`;
+    let slotsReturned = 0;
+
+    if (dayPreferred.length > 0) {
+      const preferred = dayPreferred.slice(0, 4);
+      slotsReturned = preferred.length;
+      const formatted = preferred.map((sl) => formatSlot(sl, tz)).join('\n');
+      result = `Available slots for ${service.name}${dayLabel}${
+        todPretty ? ` (${todPretty})` : ''
+      }:\n${formatted}\n\nOffer 2 of these to the caller. Use the ISO slot ID exactly as starts_at_iso when calling create_appointment.`;
+    } else if (todPretty && dayUnfiltered.length > 0) {
+      // Caller's preferred time-of-day is booked, but day has openings.
+      const alts = dayUnfiltered.slice(0, 4);
+      slotsReturned = alts.length;
+      const formatted = alts.map((sl) => formatSlot(sl, tz)).join('\n');
+      result = `NO ${todPretty.toUpperCase()} SLOTS available${dayLabel} for ${service.name}. Other openings that same day:\n${formatted}\n\nTell the caller their preferred time is booked and offer 2 of these alternatives. Use the ISO slot ID exactly when calling create_appointment.`;
     } else {
-      const formatted = slots
-        .map((slot) => {
-          const local = toZonedTime(slot.startsAt, tz);
-          const dayLabel = format(local, 'EEEE, MMM d');
-          const timeLabel = format(local, 'h:mm a');
-          return `- ${dayLabel} at ${timeLabel} with ${slot.providerName} (slot ID: ${slot.startsAt.toISOString()})`;
-        })
-        .join('\n');
-      result = `Available slots for ${service.name}:\n${formatted}\n\nWhen offering to caller, mention only 2 slots. Use the ISO timestamp as starts_at_iso when calling create_appointment.`;
+      // Whole day (or window) is booked — widen the search.
+      const widerEnd = addDays(range.end, 14);
+      const wider = await pms.getAvailability({
+        spaId: env.DEMO_SPA_ID,
+        serviceId: service.id,
+        providerId,
+        rangeStart: range.end,
+        rangeEnd: widerEnd,
+        maxSlots: 12,
+      });
+      const widerPreferred =
+        todPretty ? filterByTimeOfDay(wider, args.preferred_time_of_day, tz) : wider;
+      const chosen = (widerPreferred.length > 0 ? widerPreferred : wider).slice(0, 4);
+      slotsReturned = chosen.length;
+      if (chosen.length === 0) {
+        result = `FULLY BOOKED${dayLabel}${
+          todPretty ? ` for ${todPretty}` : ''
+        } and the next two weeks for ${service.name}. Apologize and offer to take a callback number via transfer_to_human.`;
+      } else {
+        const formatted = chosen.map((sl) => formatSlot(sl, tz)).join('\n');
+        result = `NOTHING AVAILABLE${dayLabel}${
+          todPretty ? ` (${todPretty})` : ''
+        } for ${service.name}. The next openings are:\n${formatted}\n\nTell the caller their requested window is full and offer 2 of these. Use the ISO slot ID exactly when calling create_appointment.`;
+      }
     }
 
     await logToolCall({
       vapiCallId: parsed.message.call.id,
       toolName: 'get_availability',
       args,
-      result: { count: slots.length },
+      result: { count: slotsReturned },
       durationMs: Date.now() - start,
     });
 

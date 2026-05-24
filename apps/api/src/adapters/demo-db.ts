@@ -1,8 +1,8 @@
 // apps/api/src/adapters/demo-db.ts
 import { db } from '../db';
 import * as s from '@medspa/db/schema';
-import { and, eq, gt, gte, lt, lte } from 'drizzle-orm';
-import { addMinutes, startOfDay, endOfDay, format } from 'date-fns';
+import { and, eq, gt, lt } from 'drizzle-orm';
+import { addMinutes, format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import type {
   PMSAdapter,
@@ -160,7 +160,11 @@ export class DemoDbAdapter implements PMSAdapter {
         const winStart = fromZonedTime(`${dayStr}T${sched.startTime}:00`, tz);
         const winEnd = fromZonedTime(`${dayStr}T${sched.endTime}:00`, tz);
 
-        // Existing appointments for this provider today
+        // Existing appointments overlapping this provider's working window.
+        // Use absolute-instant overlap (same shape as createAppointment's
+        // conflict check) instead of server-local day boundaries — otherwise
+        // server-tz ≠ spa-tz drops bookings whose startsAt crosses the
+        // server's midnight, and slots get reported as free when they aren't.
         const dayBookings = await db
           .select()
           .from(s.appointments)
@@ -168,8 +172,8 @@ export class DemoDbAdapter implements PMSAdapter {
             and(
               eq(s.appointments.providerId, provider.id),
               eq(s.appointments.status, 'scheduled'),
-              gte(s.appointments.startsAt, startOfDay(day)),
-              lte(s.appointments.startsAt, endOfDay(day)),
+              lt(s.appointments.startsAt, winEnd),
+              gt(s.appointments.endsAt, winStart),
             ),
           );
 

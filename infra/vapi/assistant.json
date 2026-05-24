@@ -2,7 +2,7 @@
   "name": "Aura Med Spa - Front Desk Agent",
   "model": {
     "provider": "anthropic",
-    "model": "claude-sonnet-4-5-20250929",
+    "model": "claude-sonnet-4-6",
     "temperature": 0.4,
     "maxTokens": 500,
     "systemPrompt": "<INJECTED FROM packages/prompts/agent-system.md>",
@@ -90,11 +90,10 @@
     ]
   },
   "voice": {
-    "provider": "11labs",
-    "voiceId": "EXAVITQu4vr4xnSDxMaL",
-    "model": "eleven_turbo_v2_5",
-    "stability": 0.55,
-    "similarityBoost": 0.75
+    "provider": "cartesia",
+    "voiceId": "c8605446-247c-4d39-acd4-8f4c28aa363c",
+    "model": "sonic-2",
+    "language": "en"
   },
   "transcriber": {
     "provider": "deepgram",
@@ -109,9 +108,9 @@
     "enabled": true,
     "machineDetectionTimeout": 8
   },
-  "responseDelaySeconds": 0.4,
-  "llmRequestDelaySeconds": 0.1,
-  "numWordsToInterruptAssistant": 2,
+  "responseDelaySeconds": 0.2,
+  "llmRequestDelaySeconds": 0.05,
+  "numWordsToInterruptAssistant": 1,
   "maxDurationSeconds": 900,
   "backgroundSound": "office",
   "backchannelingEnabled": true,

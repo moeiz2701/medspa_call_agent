@@ -1,7 +1,7 @@
 // apps/api/src/tools/create-appointment.ts
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { addDays, format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { db } from '../db';
 import { env } from '../env';
@@ -12,6 +12,7 @@ import { pms } from '../adapters/demo-db';
 import { sendSms } from '../lib/sms';
 import { liveBus } from '../lib/events';
 import { logToolCall } from '../lib/logging';
+import type { TimeSlot } from '../adapters/types';
 
 // Normalize empty-string optionals to undefined — LLMs frequently pass "".
 const optionalString = z
@@ -72,9 +73,14 @@ export async function createAppointmentRoute(app: FastifyInstance) {
       };
     }
 
+    // Resolved outside the try so the catch branch can use them for
+    // alternative-slot lookup on SLOT_NO_LONGER_AVAILABLE.
+    let service: typeof s.services.$inferSelect | undefined;
+    let provider: typeof s.providers.$inferSelect | undefined;
+
     try {
       // Resolve service
-      const [service] = await db
+      [service] = await db
         .select()
         .from(s.services)
         .where(
@@ -87,7 +93,7 @@ export async function createAppointmentRoute(app: FastifyInstance) {
       if (!service) throw new Error('Service not found');
 
       // Resolve provider
-      const [provider] = await db
+      [provider] = await db
         .select()
         .from(s.providers)
         .where(
@@ -169,8 +175,39 @@ export async function createAppointmentRoute(app: FastifyInstance) {
       const message = err instanceof Error ? err.message : String(err);
       app.log.error({ err, args }, 'create_appointment failed');
       let userMsg: string;
-      if (message === 'SLOT_NO_LONGER_AVAILABLE') {
-        userMsg = 'That slot was just booked. Call get_availability again and offer a different time.';
+      if (message === 'SLOT_NO_LONGER_AVAILABLE' && service) {
+        // Fetch a few nearby alternatives so the agent can recover smoothly
+        // instead of dead-ending the caller.
+        const [spaForTz] = await db
+          .select()
+          .from(s.spas)
+          .where(eq(s.spas.id, env.DEMO_SPA_ID));
+        const tz = spaForTz?.timezone ?? 'America/New_York';
+        let alts: TimeSlot[] = [];
+        try {
+          alts = await pms.getAvailability({
+            spaId: env.DEMO_SPA_ID,
+            serviceId: service.id,
+            providerId: provider?.id,
+            rangeStart: startsAtDate,
+            rangeEnd: addDays(startsAtDate, 7),
+            maxSlots: 3,
+          });
+        } catch (lookupErr) {
+          app.log.warn({ lookupErr }, 'alternative-slot lookup failed after conflict');
+        }
+        if (alts.length > 0) {
+          const lines = alts
+            .map((sl) => {
+              const local = toZonedTime(sl.startsAt, tz);
+              return `- ${format(local, 'EEEE, MMM d')} at ${format(local, 'h:mm a')} with ${sl.providerName} (slot ID: ${sl.startsAt.toISOString()})`;
+            })
+            .join('\n');
+          userMsg = `That slot was just booked by someone else. Apologize briefly to the caller, then offer one of these next openings:\n${lines}\n\nUse the ISO slot ID exactly when retrying create_appointment.`;
+        } else {
+          userMsg =
+            'That slot was just booked and no nearby alternatives are open. Apologize, then call get_availability with a wider day range and offer a different time.';
+        }
       } else if (message.includes('not found')) {
         userMsg = `Could not find ${message}. Call list_services and verify the exact name.`;
       } else {
